@@ -1,0 +1,26 @@
+=========================================
+ACME CORP - ENGINEERING & TESTING GUIDELINES
+=========================================
+VERSION: 2.4
+LAST UPDATED: April 2026
+
+1. BUSINESS ANALYSIS & REQUIREMENTS STANDARDS
+- All User Stories must follow the format: "As a [Persona], I want to [Action], So that [Value]."
+- Acceptance Criteria must be clearly bulleted.
+- Security Standard: Any feature involving user authentication, login, or data modification MUST include an acceptance criterion regarding session timeouts (standard is 15 minutes of inactivity).
+- Accessibility Standard: Ensure all new UI features mention WCAG 2.1 AA compliance in the acceptance criteria.
+
+2. QUALITY ASSURANCE & TEST CASE DESIGN
+- NO BDD / GHERKIN: Do absolutely NOT use Given/When/Then syntax. 
+- Test cases must be written in a clear, step-by-step format: Test Name, Steps to Execute, and Expected Result.
+- Edge Cases: Every test suite must include boundary value analysis and at least two negative test scenarios.
+- Standard Test Data: Always use "admin@acmecorp.local" for admin persona tests and "user@acmecorp.local" for standard user tests.
+- Password Rules: When testing passwords, assume the system requires at least 12 characters, one uppercase, one number, and one special character.
+
+3. AUTOMATION ENGINEERING & SELENIUM STANDARDS
+- Framework: Use Python, Pytest, and Selenium WebDriver.
+- Architecture: Strictly adhere to the Page Object Model (POM) design pattern. Separate page classes from test logic.
+- Waiting Strategy: NEVER use `time.sleep()`. You must use Selenium's `WebDriverWait` with `expected_conditions` (Explicit Waits) for all element interactions.
+- Locators: Prefer `By.ID` or `By.CSS_SELECTOR`. Only use `By.XPATH` if absolutely necessary.
+- Assertions: Every test script must end with a clear Pytest assertion validating the expected outcome.
+- Browser Setup: Assume a standard Pytest fixture named `driver` is already available (passed via conftest.py) that handles browser initialization. Do not write the `webdriver.Chrome()` setup code in the individual test files.

@@ -1,0 +1,14 @@
+business_analyst:
+  role: "Senior Business Analyst"
+  goal: "Convert the raw business requirement into a standard Agile User Story with clear Acceptance Criteria."
+  expected_output: "Return the format: 'As a [User], I want to [Action], So that [Value].' followed by a bulleted list of Acceptance Criteria."
+
+qa_engineer:
+  role: "Senior QA Engineer"
+  goal: "Analyze the User Story and Acceptance Criteria, and design comprehensive, step-by-step test cases. Include positive, negative, and edge cases."
+  expected_output: "Return a Markdown list of test cases. Each test case must clearly state the Test Name, Steps to Execute, and Expected Result. Do NOT use BDD or Gherkin syntax."
+
+automation_engineer:
+  role: "Expert Automation Engineer"
+  goal: "Generate clean pytest + Selenium code using the Page Object Model (POM) pattern based on the provided step-by-step test cases."
+  expected_output: "Return only complete, executable Python code with proper imports."
