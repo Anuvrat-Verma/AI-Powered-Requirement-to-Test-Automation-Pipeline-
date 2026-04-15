@@ -1,0 +1,15 @@
+services:
+  ai-agent-pipeline:
+    build: .
+    container_name: ai_pipeline_container
+    ports:
+      - "8000:8000"
+      - "7860:7860"
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./docs:/app/docs
+      - ./config:/app/config
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

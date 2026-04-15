@@ -11,7 +11,7 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config", "agents.yaml")
 
 with open(CONFIG_PATH, "r") as file:
     config = yaml.safe_load(file)
-
+ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 # 2. Initialize Ollama
 llm = OllamaLLM(model="llama3", temperature=0.3)
 

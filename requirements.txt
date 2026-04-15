@@ -1,7 +1,10 @@
 fastapi
-uvicorn[standard]
-python-multipart
-faster-whisper
+uvicorn
+gradio
+langchain
 langchain-ollama
+chromadb
+faster-whisper
+pyyaml
 requests
-pydantic
+python-multipart
