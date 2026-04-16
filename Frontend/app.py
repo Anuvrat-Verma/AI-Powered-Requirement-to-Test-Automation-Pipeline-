@@ -107,7 +107,7 @@ with gr.Blocks(title="AI Requirement to Test", theme=gr.themes.Soft()) as demo:
 
         with gr.Column(scale=1):
             with gr.Tabs():
-                with gr.Tab("1. 📋 Gherkin User Stories"):
+                with gr.Tab("1. 📋 User Stories"):
                     stories_output = gr.Markdown(value="*Generated stories will appear here...*")
                 with gr.Tab("2. ✅ Test Cases"):
                     tests_output = gr.Markdown(value="*Generated test cases will appear here...*")
