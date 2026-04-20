@@ -1,39 +1,22 @@
 import gradio as gr
 import requests
-import os
+import time
 
-# ================== CONFIG ==================
 BACKEND_URL = "http://127.0.0.1:8000"
 
-# ===========================================
 
-def upload_rag_files(files):
-    if not files:
+def process_requirements(text: str, audio_file, use_rag: bool = True):
+    # Initial UI feedback
+    if not text and not audio_file:
+        yield "❌ Error", "", "", "Please provide input."
         return
 
-    file_data = []
-    for f in files:
-        # Safely handle both filepaths (strings) and file objects based on Gradio version
-        file_path = f if isinstance(f, str) else f.name
-        file_data.append(("files", (os.path.basename(file_path), open(file_path, "rb"))))
-
-    try:
-        resp = requests.post(f"{BACKEND_URL}/upload_docs", files=file_data)
-        if resp.status_code == 200:
-            gr.Info(f"✅ Knowledge Base Updated: {resp.json().get('message')}")
-        else:
-            gr.Warning(f"❌ Upload failed: {resp.text}")
-    except Exception as e:
-        gr.Error(f"❌ Backend connection error: {str(e)}")
-
-
-def process_requirements(text: str, audio_file, use_rag: bool = False):
-    if not text and not audio_file:
-        return "❌ Please enter text or record audio.", "", ""
+    # 1. Start Status
+    yield "⏳ Transcribing/Processing...", "...", "...", "Starting pipeline..."
 
     transcribed_text = text
 
-    # Step 1: Transcribe audio if provided
+    # Handle audio transcription
     if audio_file:
         try:
             with open(audio_file, "rb") as f:
@@ -42,100 +25,78 @@ def process_requirements(text: str, audio_file, use_rag: bool = False):
 
             if resp.status_code == 200:
                 transcribed_text = resp.json().get("transcribed_text", text)
+                yield "✅ Transcribed", "...", "...", f"Prompt: {transcribed_text[:50]}..."
             else:
-                return f"❌ Transcription failed: {resp.text}", "", ""
+                yield "❌ STT Failed", "", "", f"Error: {resp.text}"
+                return
         except Exception as e:
-            return f"❌ STT Error: {str(e)}", "", ""
+            yield "❌ Connection Error", "", "", str(e)
+            return
 
-    # Step 2: Generate stories, test cases & code
+    # 2. Call backend for the Multi-Agent heavy lifting
+    yield "🤖 Agents are working (BA -> QA -> SDET)...", "...", "...", "This usually takes 30-60 seconds."
+
     try:
-        payload = {
-            "requirements": transcribed_text,
-            "use_rag": use_rag
-        }
-
+        payload = {"requirements": transcribed_text, "use_rag": use_rag}
+        # We use a long timeout because Llama 3 is generating 3 different artifacts
         resp = requests.post(f"{BACKEND_URL}/generate", json=payload, timeout=1000)
 
         if resp.status_code == 200:
             data = resp.json()
-            return (
-                data.get("user_stories", "No output"),
-                data.get("test_cases", "No output"),
-                data.get("test_code", "No output")
+
+            # Format Compliance Result
+            comp = data.get("compliance_evaluation", "")
+            status_header = "✅ COMPLIANT" if "✅" in comp else "❌ REJECTED"
+
+            yield (
+                data.get("user_stories", ""),
+                data.get("test_cases", ""),
+                data.get("test_code", ""),
+                f"### {status_header}\n\n{comp}"
             )
         else:
-            return f"❌ Generation failed: {resp.text}", "", ""
+            yield "❌ Backend Error", "", "", f"Status {resp.status_code}: {resp.text}"
 
     except requests.exceptions.Timeout:
-        return "⏱️ Timeout: The agents are taking too long.", "", ""
+        yield "⏰ Timeout", "", "", "The backend is taking too long. Check if Ollama is running."
     except Exception as e:
-        return f"❌ Error connecting to backend: {str(e)}", "", ""
+        yield "❌ Error", "", "", str(e)
 
 
 # ====================== GRADIO UI ======================
-with gr.Blocks(title="AI Requirement to Test", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 🚀 AI Requirement-to-Test Automation Pipeline")
-    gr.Markdown("**Backend:** FastAPI | **Frontend:** Gradio | **LLM:** Ollama")
+with gr.Blocks(title="AI SDET Pipeline", theme=gr.themes.Default(primary_hue="blue")) as demo:
+    gr.Markdown("# 🚀 AI Requirement-to-Test Pipeline")
 
     with gr.Row():
         with gr.Column(scale=1):
-            text_input = gr.Textbox(
-                label="📝 Business Requirements",
-                placeholder="As a customer, I want to login and view my order history...",
-                lines=8
-            )
+            text_input = gr.Textbox(label="Business Requirements", lines=6, placeholder="Describe the feature...")
+            audio_input = gr.Audio(label="Voice Input", sources=["microphone"], type="filepath")
+            use_rag = gr.Checkbox(label="Use Knowledge Base (RAG)", value=True)
 
-            audio_input = gr.Audio(
-                label="🎤 Or Speak Your Requirements (Voice Input)",
-                sources=["microphone", "upload"],
-                type="filepath"
-            )
+            generate_btn = gr.Button("🚀 Generate & Evaluate", variant="primary")
 
-            use_rag = gr.Checkbox(
-                label="🔍 Use Company Knowledge Base (RAG)",
-                value=False,
-                interactive=True
-            )
+        with gr.Column(scale=2):
+            # Status Indicator (Crucial for UX)
+            status_box = gr.Markdown("### Status: Ready 🟢")
 
-            rag_upload = gr.File(
-                label="📁 Upload Context Docs (.txt)",
-                file_count="multiple",
-                file_types=[".txt"]
-            )
-
-            generate_btn = gr.Button("🚀 Generate Tests", variant="primary", size="large")
-
-        with gr.Column(scale=1):
             with gr.Tabs():
-                with gr.Tab("1. 📋 User Stories"):
-                    stories_output = gr.Markdown(value="*Generated stories will appear here...*")
-                with gr.Tab("2. ✅ Test Cases"):
-                    tests_output = gr.Markdown(value="*Generated test cases will appear here...*")
-                with gr.Tab("3. 💻 Selenium Test Code"):
-                    code_output = gr.Code(
-                        language="python",
-                        show_label=True,
-                        value="# Automation code will appear here..."
-                    )
+                with gr.Tab("📋 User Stories"):
+                    stories_out = gr.Markdown()
+                with gr.Tab("✅ Test Cases"):
+                    tests_out = gr.Markdown()
+                with gr.Tab("💻 Selenium Code"):
+                    code_out = gr.Code(language="python")
+                with gr.Tab("📊 Compliance"):
+                    compliance_out = gr.Markdown()
 
-    # Button Actions
+    # Link the button to the function
+    # 'yield' in the function allows us to update the status_box in real-time
     generate_btn.click(
         fn=process_requirements,
         inputs=[text_input, audio_input, use_rag],
-        outputs=[stories_output, tests_output, code_output]
+        outputs=[stories_out, tests_out, code_out, compliance_out],
+        show_progress="full"
     )
-
-    rag_upload.upload(
-        fn=upload_rag_files,
-        inputs=[rag_upload],
-        outputs=None
-    )
-
-    gr.Markdown("---\nMade with FastAPI + Gradio + Ollama")
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="127.0.0.1",
-        server_port=7860,
-        share=False
-    )
+    demo.launch(server_name="127.0.0.1", server_port=7860)

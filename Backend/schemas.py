@@ -8,6 +8,7 @@ class GenerateResponse(BaseModel):
     user_stories: str
     test_cases: str
     test_code: str
+    compliance_evaluation: str  # ← Add this line
 
 class TranscribeResponse(BaseModel):
     transcribed_text: str

@@ -1,0 +1,22 @@
+1. Start Backend (FastAPI)
+Open Terminal 1 and run:
+Bash# Go to project root
+cd "/Users/shashi/Desktop/AI Requirements-to-Testscript"
+
+# Activate virtual environment
+source venv311/bin/activate
+
+# Go to backend folder and start
+cd backend
+python -m uvicorn main:app --reload --port 8000
+2. Start Frontend (Gradio)
+Open Terminal 2 (new terminal) and run:
+Bash# Go to project root
+cd "/Users/shashi/Desktop/AI Requirements-to-Testscript"
+
+# Activate virtual environment
+source venv311/bin/activate
+
+# Go to frontend folder and start
+cd frontend
+python app.py

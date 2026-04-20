@@ -1,14 +1,17 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from evaluator import selenium_evaluator
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import tempfile
-import os
-from rag import ingest_documents, retrieve_context
-from schemas import GenerateRequest, GenerateResponse, TranscribeResponse
-from stt import transcribe_audio
-from agents import agent1_generate_stories, agent2_generate_test_cases, agent3_generate_code
 import shutil
 from typing import List
-
+from rag import ingest_documents, retrieve_context
+from stt import transcribe_audio
+from agents import agent1_generate_stories, agent2_generate_test_cases, agent3_generate_code
+from schemas import GenerateRequest, GenerateResponse, TranscribeResponse
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 app = FastAPI(title="AI Requirement-to-Test Pipeline")
 
 app.add_middleware(
@@ -37,19 +40,42 @@ async def transcribe(audio: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/generate", response_model=GenerateResponse)
+# Backend/main.py
+
+@app.post("/generate")
 def generate(request: GenerateRequest):
     try:
-        # The pipeline flows normally, but we pass the RAG flag to every agent
+        # 1. BA and QA agents run once
         stories = agent1_generate_stories(request.requirements, request.use_rag)
         test_cases = agent2_generate_test_cases(stories, request.use_rag)
+
+        # 2. Automation Agent runs with a Retry Loop
         code = agent3_generate_code(test_cases, request.use_rag)
+        compliance_result = selenium_evaluator.evaluate(code)
+
+        max_retries = 1  # We'll try to fix it once if it fails
+        retry_count = 0
+
+        while "❌ REJECTED" in compliance_result and retry_count < max_retries:
+            print(f"🔄 [Self-Correction] Code failed (Score: {compliance_result}). Retrying...")
+
+            # Feed the 'REJECTED' message back into the agent
+            code = agent3_generate_code(test_cases, request.use_rag, feedback=compliance_result)
+
+            # Re-evaluate the new code
+            compliance_result = selenium_evaluator.evaluate(code)
+            retry_count += 1
+
+        if retry_count > 0:
+            print(f"✅ [Self-Correction] Attempt {retry_count} finished with: {compliance_result}")
 
         return {
             "user_stories": stories,
             "test_cases": test_cases,
-            "test_code": code
+            "test_code": code,
+            "compliance_evaluation": compliance_result
         }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

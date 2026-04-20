@@ -31,24 +31,43 @@ Input Data:
 {agent['expected_output']}"""
 
 
-# 4. Agentic RAG: The Query Generator
+# Backend/agents.py
+
 def get_targeted_context(agent_name: str, input_data: str) -> str:
     """Uses the LLM to generate a specific search query, then fetches from ChromaDB."""
     agent_role = config[agent_name]['role']
 
-    # Ask Llama to write a search query based on what it's about to do
-    query_prompt = f"""You are a database search assistant for a {agent_role}. 
-Based on the following input, write a single, highly specific search query to find relevant rules, templates, or coding standards in our knowledge base.
-Return ONLY the search string. Do not include conversational text or quotes.
+    # 1. Add steering instructions based on the agent's identity
+    special_instruction = ""
+    if agent_name == "automation_engineer":
+        special_instruction = (
+            "IMPORTANT: Do NOT query for business details. Focus exclusively on "
+            "Browser setup, framework, architecture, assertions, Selenium POM standards, Python locator strategies (By.ID/By.CSS_SELECTOR), "
+            "and WebDriverWait implementation rules."
+        )
+    elif agent_name == "qa_engineer":
+        special_instruction = "Focus on edge cases, negative testing, and Gherkin-to-Test-Case mapping."
+
+    # 2. Update the prompt to include the special instruction
+    query_prompt = f"""You are a technical search assistant for a {agent_role}. 
+{special_instruction}
+
+Based on the input data, write a single, professional search query to retrieve coding standards, 
+architectural templates, or testing rules from our knowledge base.
 
 Input Data: 
-{input_data}"""
+{input_data}
 
-    # 1. Generate the query
+Return ONLY the search string."""
+
+    # 3. Generate the query
     search_query = llm.invoke(query_prompt).strip()
-    print(f"🔍 [{agent_role}] Querying database for: {search_query}")
 
-    # 2. Retrieve the specific documents
+    # This will now print something like:
+    # "Selenium POM locator standards CSS_SELECTOR WebDriverWait template"
+    print(f"🔍 [{agent_role}] Optimized Query: {search_query}")
+
+    # 4. Retrieve the specific documents
     return retrieve_context(search_query)
 
 
@@ -65,7 +84,16 @@ def agent2_generate_test_cases(stories: str, use_rag: bool = False) -> str:
     return llm.invoke(prompt).strip()
 
 
-def agent3_generate_code(test_cases: str, use_rag: bool = False) -> str:
+# Backend/agents.py
+
+def agent3_generate_code(test_cases: str, use_rag: bool = False, feedback: str = "") -> str:
+    """Now accepts an optional feedback string for self-correction."""
     context = get_targeted_context("automation_engineer", test_cases) if use_rag else ""
-    prompt = build_prompt("automation_engineer", test_cases, context)
+
+    # If there is feedback, we append it to the input so the LLM sees its mistakes
+    input_data = test_cases
+    if feedback:
+        input_data = f"{test_cases}\n\n⚠️ PREVIOUS ATTEMPT FAILED COMPLIANCE:\n{feedback}\nPlease refactor the code to fix these issues."
+
+    prompt = build_prompt("automation_engineer", input_data, context)
     return llm.invoke(prompt).strip()

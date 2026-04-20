@@ -1,26 +1,27 @@
-# Use a Python 3.11 base image
 FROM python:3.11-slim
-
-# Install system dependencies for Faster-Whisper and Selenium
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libmagic1 \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy and install requirements
+# Added ffmpeg - Faster-Whisper WILL fail without it
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    portaudio19-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your code into the container
 COPY . .
 
-# Expose the ports for FastAPI and Gradio
+# Set the environment variable so it can find 'Backend'
+ENV PYTHONPATH=/app
+
 EXPOSE 8000
 EXPOSE 7860
 
-# Run both the backend and frontend
-CMD ["sh", "-c", "uvicorn Backend.main:app --host 0.0.0.0 --port 8000 & python Frontend/app.py"]
+ENV PYTHONPATH="/app:/app/Backend"
+
+# We run from /app so the 'Backend' and 'Frontend' folders are visible
+CMD ["sh", "-c", "python3 -m uvicorn Backend.main:app --host 0.0.0.0 --port 8000 & python3 Frontend/app.py"]
